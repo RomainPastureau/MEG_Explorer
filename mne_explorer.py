@@ -15,15 +15,18 @@ root.withdraw()
 
 # FIF file
 message_box('Step 1 of 3', 'First, select the first FIF file containing your data. Click on OK to open the browser.', 0)
-path_fif = filedialog.askopenfilename(title="Select the first FIF file containing your data", filetypes="fif")
+path_fif = filedialog.askopenfilename(title="Select the first FIF file containing your data",
+                                      filetypes=[("FIF file", "*.fif")])
 
 # Crosstalk file
 message_box('Step 2 of 3', 'Next, select the crosstalk file. It should start with "ct_sparse".', 0)
-path_ct = filedialog.askopenfilename(title="Select the crosstalk file, starting with ct_sparse", filetypes="fif")
+path_ct = filedialog.askopenfilename(title="Select the crosstalk file, starting with ct_sparse",
+                                     filetypes=[("FIF file", "*.fif")])
 
 # Calibration file
 message_box('Step 3 of 3', 'Finally, select the calibration file. It should start with "sss_cal.', 0)
-path_cal = filedialog.askopenfilename(title="Select the crosstalk file, starting with ct_sparse", filetypes="dat")
+path_cal = filedialog.askopenfilename(title="Select the crosstalk file, starting with ct_sparse",
+                                      filetypes=[("DAT file", "*.dat")])
 
 # Read FIF
 raw_fif = mne.io.read_raw_fif(path_fif, preload=False, verbose=False)
