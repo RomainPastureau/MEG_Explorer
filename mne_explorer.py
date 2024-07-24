@@ -9,11 +9,6 @@ from psutil._common import bytes2human
 def get_readable_filesize(text_file: Path):
     return bytes2human(text_file.stat().st_size)
 
-
-if __name__ == '__main__':
-    current_file = Path(__file__).parent.resolve()
-    print(get_readable_filesize(current_file / 'file.txt'))
-
 # Message box
 def message_box(title, text, style):
     """Creates a message box"""
@@ -21,8 +16,6 @@ def message_box(title, text, style):
 
 root = tk.Tk()
 root.withdraw()
-
-
 
 def preprocess_data():
     # FIF file
