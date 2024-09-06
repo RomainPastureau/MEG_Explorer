@@ -1,23 +1,19 @@
 import tkinter as tk
-from tkinter import ttk
 from tkinter import filedialog
 import ctypes
 import mne
-from mne.preprocessing import find_bad_channels_maxwell as fbcm
 from pathlib import Path
 from psutil._common import bytes2human
 from datetime import datetime as dt
 import os.path as op
-from threading import Thread
 
-global root
+mne.set_config("MNE_BROWSER_BACKEND", "qt")
+
 root = tk.Tk()
 root.withdraw()
 
-
-def get_readable_filesize(text_file: Path):
+def get_readable_file_size(text_file: Path):
     return bytes2human(text_file.stat().st_size)
-
 
 # Message box
 def message_box(title, text, style):
@@ -25,16 +21,9 @@ def message_box(title, text, style):
     return ctypes.windll.user32.MessageBoxW(0, text, title, style)
 
 
-mne.set_config("MNE_BROWSER_BACKEND", "qt")
+class PreProcess(object):
 
-size = 0
-raw_filtered = None
-
-
-class PreProcessThread(Thread):
     def __init__(self, path_fif, path_ct, path_cal):
-        super().__init__()
-
         self.percent = 0
         self.current_step = "Reading the FIF file"
         self.path_fif = path_fif
@@ -42,6 +31,7 @@ class PreProcessThread(Thread):
         self.path_cal = path_cal
 
     def run(self):
+        size = 0
         time_begin = dt.now()
 
         # Read FIF
@@ -54,14 +44,14 @@ class PreProcessThread(Thread):
         self.current_step = "Detecting the bad channels"
 
         # Calculate the size
-        global size
         for file in raw_fif._filenames:
             size += Path(file).stat().st_size
 
         # Get automatic bad channels
         print("Detecting the bad channels")
         time_before = dt.now()
-        auto_noisy_channels, auto_flat_channels, auto_scores = fbcm(raw_fif, cross_talk=self.path_ct,
+        auto_noisy_channels, auto_flat_channels, auto_scores = mne.preprocessing.find_bad_channels_maxwell(raw_fif,
+                                                                    cross_talk=self.path_ct,
                                                                     calibration=self.path_cal,
                                                                     return_scores=True, duration=30, min_count=10,
                                                                     verbose=False)
@@ -113,7 +103,7 @@ class PreProcessThread(Thread):
 
         print("Filtering the data")
         time_before = dt.now()
-        self.raw_filtered = raw_sss.filter(l_freq=0.01, h_freq=120, picks='meg', phase='zero-double', n_jobs=6,
+        raw_filtered = raw_sss.filter(l_freq=0.01, h_freq=120, picks='meg', phase='zero-double', n_jobs=6,
                                            verbose=False)
         print(f"Step performed in {dt.now() - time_before}")
 
@@ -122,62 +112,7 @@ class PreProcessThread(Thread):
 
         print(f"Full pre-processing performed in {dt.now() - time_begin}")
 
-
-class App(tk.Tk):
-    def __init__(self, path_fif, path_ct, path_cal):
-        super().__init__()
-        self.resizable(0, 0)
-        self.raw_filtered = None
-        self.title('Pre-processing')
-
-        # Progress frame
-        self.progress_frame = ttk.Frame(self)
-
-        # configrue the grid to place the progress bar is at the center
-        self.progress_frame.columnconfigure(0, weight=1)
-        self.progress_frame.rowconfigure(0, weight=3)
-        self.progress_frame.rowconfigure(1, weight=1)
-
-        # progressbar
-        self.pb = ttk.Progressbar(self.progress_frame, orient=tk.HORIZONTAL, length=250, mode='determinate')
-        self.pb.grid(row=0, column=0)
-
-        self.value_label = ttk.Label(self.progress_frame)
-        self.value_label.grid(column=0, row=1)
-
-        # place the progress frame
-        self.progress_frame.grid(row=0, column=0)
-
-        self.handle_preprocessing(path_fif, path_ct, path_cal)
-
-    def start_preprocessing(self):
-        self.progress_frame.tkraise()
-
-    def stop_preprocessing(self):
-        self.pb.stop()
-        raw_filtered = self.raw_filtered
-        root.quit()
-
-    def handle_preprocessing(self, path_fif, path_ct, path_cal):
-        self.start_preprocessing()
-
-        thread = PreProcessThread(path_fif, path_ct, path_cal)
-        thread.start()
-
-        self.monitor(thread)
-
-    def monitor(self, thread):
-        """ Monitor the download thread """
-        if thread.is_alive():
-            self.value_label['text'] = thread.current_step
-            self.pb['value'] = thread.percent
-            self.after(1000, lambda: self.monitor(thread))
-        else:
-            if thread.percent == 100:
-                self.raw_filtered = thread.raw_filtered
-                global raw_filtered
-                raw_filtered = self.raw_filtered
-            self.stop_preprocessing()
+        return size, raw_filtered
 
 
 def preprocess_data():
@@ -200,11 +135,8 @@ def preprocess_data():
     path_cal = filedialog.askopenfilename(parent=root, title="Select the calibration file, starting with sss",
                                           filetypes=[("DAT file", "*.dat")])
 
-    app = App(path_fif, path_ct, path_cal)
-    app.mainloop()
-
-    # root = tk.Tk()
-    # root.withdraw()
+    pre_processing = PreProcess(path_fif, path_ct, path_cal)
+    size, raw_filtered = pre_processing.run()
 
     print("Saving the data")
     result = message_box('Saving the data',
